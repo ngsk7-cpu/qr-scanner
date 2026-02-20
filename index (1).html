@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>QR Check-in Scanner</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+    header {
+      width: 100%;
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      padding: 20px;
+      text-align: center;
+    }
+    header h1 { font-size: 22px; font-weight: 700; }
+    header p  { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px 48px;
+    }
+    .cam-box {
+      position: relative;
+      width: 94vw;
+      height: 94vw;
+      max-width: 460px;
+      max-height: 460px;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #1e293b;
+      border: 3px solid #334155;
+    }
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #canvas { display: none; }
+    .scan-line {
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, transparent, #3b82f6, #60a5fa, #3b82f6, transparent);
+      animation: scan 2s linear infinite;
+      box-shadow: 0 0 16px #3b82f6;
+    }
+    @keyframes scan {
+      0%  { top: 0 }
+      50% { top: calc(100% - 4px) }
+      100%{ top: 0 }
+    }
+    .corner { position: absolute; width: 36px; height: 36px; border-color: #3b82f6; border-style: solid; border-width: 0; }
+    .corner.tl { top:14px; left:14px;  border-top-width:4px; border-left-width:4px;  border-radius:5px 0 0 0; }
+    .corner.tr { top:14px; right:14px; border-top-width:4px; border-right-width:4px; border-radius:0 5px 0 0; }
+    .corner.bl { bottom:14px; left:14px;  border-bottom-width:4px; border-left-width:4px;  border-radius:0 0 0 5px; }
+    .corner.br { bottom:14px; right:14px; border-bottom-width:4px; border-right-width:4px; border-radius:0 0 5px 0; }
+    #start-btn {
+      margin-top: 16px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 94vw;
+      max-width: 460px;
+    }
+    .badge {
+      margin-top: 16px;
+      padding: 13px 24px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 2px solid #334155;
+      width: 94vw;
+      max-width: 460px;
+      text-align: center;
+    }
+    .badge.scanning { color: #60a5fa; border-color: #3b82f6; background: rgba(59,130,246,0.1); }
+    .result {
+      display: none;
+      width: 94vw;
+      max-width: 460px;
+      margin-top: 20px;
+      border-radius: 20px;
+      padding: 32px 20px;
+      text-align: center;
+      animation: up 0.3s ease;
+    }
+    @keyframes up { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    .result.ok  { background: linear-gradient(135deg,#064e3b,#065f46); border: 2px solid #10b981; }
+    .result.err { background: linear-gradient(135deg,#7f1d1d,#991b1b); border: 2px solid #ef4444; }
+    .r-icon  { font-size: 72px; margin-bottom: 12px; }
+    .r-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .r-name  { font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+    .r-email { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 24px; }
+    .r-btn {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      border: 2px solid rgba(255,255,255,0.3);
+      padding: 15px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    .stats {
+      display: flex;
+      gap: 14px;
+      margin-top: 20px;
+      width: 94vw;
+      max-width: 460px;
+    }
+    .stat {
+      flex: 1;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 14px;
+      padding: 18px 10px;
+      text-align: center;
+    }
+    .stat .n { font-size: 38px; font-weight: 800; }
+    .stat .l { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .stat.g { border-color: #10b981; }
+    .stat.g .n { color: #10b981; }
+    .stat.r { border-color: #ef4444; }
+    .stat.r .n { color: #ef4444; }
+    .spin {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: sp 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes sp { to{ transform:rotate(360deg) } }
+    .manuel { margin-top: 20px; width: 94vw; max-width: 460px; }
+    .manuel summary { cursor:pointer; font-size:14px; color:#64748b; text-align:center; padding:10px; }
+    .mform { margin-top:10px; display:flex; gap:10px; }
+    .mform input {
+      flex:1; background:#1e293b; border:2px solid #334155;
+      border-radius:10px; padding:14px; color:#f1f5f9; font-size:16px; outline:none;
+    }
+    .mform button {
+      background:#3b82f6; color:#fff; border:none;
+      border-radius:10px; padding:14px 18px; font-size:16px; font-weight:600; cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎟️ QR Check-in Scanner</h1>
+  <p>Katılımcı QR kodunu kameraya gösterin</p>
+</header>
+
+<div class="wrap">
+
+  <div class="cam-box">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="scan-line" id="scan-line" style="display:none"></div>
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+  </div>
+
+  <button id="start-btn" onclick="kameraBaslat()">📷 Kamerayı Başlat</button>
+  <div class="badge" id="badge">Kamera bekleniyor...</div>
+
+  <div class="result" id="result">
+    <div class="r-icon"  id="r-icon"></div>
+    <div class="r-title" id="r-title"></div>
+    <div class="r-name"  id="r-name"></div>
+    <div class="r-email" id="r-email"></div>
+    <button class="r-btn" onclick="devam()">▶ Devam Et</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat g"><div class="n" id="s-ok">0</div><div class="l">Başarılı Giriş</div></div>
+    <div class="stat r"><div class="n" id="s-err">0</div><div class="l">Hata / Tekrar</div></div>
+  </div>
+
+  <details class="manuel">
+    <summary>▸ Manuel token girişi</summary>
+    <div class="mform">
+      <input type="text" id="m-token" placeholder="Token girin..." />
+      <button onclick="manuelCheckin()">Giriş</button>
+    </div>
+  </details>
+
+</div>
+
+<script>
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbysSLMzUEYHe3Fe4uLo6-cqR6N5qcPCf06PjADywoAx6dzXgOmbmtssSvWEUHwMt30J/exec";
+
+  let video, canvas, ctx;
+  let aktif = false, isleniyor = false, sonToken = "";
+  let okSay = 0, errSay = 0;
+
+  function kameraBaslat() {
+    document.getElementById("start-btn").style.display = "none";
+    setBadge("Kamera açılıyor...", false);
+    video  = document.getElementById("video");
+    canvas = document.getElementById("canvas");
+    ctx    = canvas.getContext("2d");
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width:{ideal:1280}, height:{ideal:720} }
+    }).then(stream => {
+      video.srcObject = stream;
+      video.play();
+      video.onloadedmetadata = () => {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        aktif = true;
+        document.getElementById("scan-line").style.display = "block";
+        setBadge("🔍 QR kod bekleniyor...", true);
+        requestAnimationFrame(dongu);
+      };
+    }).catch(() => {
+      setBadge("❌ Kamera erişimi reddedildi", false);
+      document.getElementById("start-btn").style.display = "block";
+    });
+  }
+
+  function dongu() {
+    if (!aktif) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const kod = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+      if (kod && kod.data && !isleniyor) {
+        let token = kod.data;
+        try { const u = new URL(kod.data); const p = u.searchParams.get("token"); if(p) token=p; } catch(e){}
+        if (token === sonToken) { requestAnimationFrame(dongu); return; }
+        isleniyor = true;
+        sonToken  = token;
+        setBadge('<span class="spin"></span>İşleniyor...', false);
+        checkin(token);
+        return;
+      }
+    }
+    requestAnimationFrame(dongu);
+  }
+
+  // JSONP — CORS sorununu tamamen aşar
+  function checkin(token) {
+    const cbName = "cb_" + Date.now();
+    const script = document.createElement("script");
+
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      if (document.body.contains(script)) document.body.removeChild(script);
+      goster({ basarili: false, mesaj: "Zaman asimi, tekrar deneyin" });
+    }, 10000);
+
+    window[cbName] = function(sonuc) {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (document.body.contains(script)) document.body.removeChild(script);
+      goster(sonuc);
+    };
+
+    script.src = APPS_SCRIPT_URL + "?token=" + encodeURIComponent(token) + "&callback=" + cbName;
+    script.onerror = function() {
+      clearTimeout(timeout);
+      delete window[cbName];
+      goster({ basarili: false, mesaj: "Baglanti hatasi, tekrar deneyin" });
+    };
+    document.body.appendChild(script);
+  }
+
+  function goster(sonuc) {
+    const el = document.getElementById("result");
+    document.getElementById("r-icon").textContent  = sonuc.basarili ? "✅" : "⚠️";
+    document.getElementById("r-title").textContent = sonuc.mesaj;
+    document.getElementById("r-name").textContent  = sonuc.ad    || "";
+    document.getElementById("r-email").textContent = sonuc.email || "";
+    el.className = "result " + (sonuc.basarili ? "ok" : "err");
+    el.style.display = "block";
+    if (sonuc.basarili) { okSay++;  document.getElementById("s-ok").textContent  = okSay;  beep(880,120); }
+    else                { errSay++; document.getElementById("s-err").textContent = errSay; beep(220,300); }
+    setBadge("Sonuç gösteriliyor...", false);
+    setTimeout(devam, 5000);
+  }
+
+  function devam() {
+    document.getElementById("result").style.display = "none";
+    isleniyor = false;
+    setTimeout(() => { sonToken = ""; }, 2000);
+    setBadge("🔍 QR kod bekleniyor...", true);
+    requestAnimationFrame(dongu);
+  }
+
+  function manuelCheckin() {
+    const t = document.getElementById("m-token").value.trim();
+    if (!t) return;
+    isleniyor = true;
+    setBadge('<span class="spin"></span>İşleniyor...', false);
+    checkin(t);
+    document.getElementById("m-token").value = "";
+  }
+
+  function setBadge(html, scanning) {
+    const b = document.getElementById("badge");
+    b.innerHTML = html;
+    b.className = "badge" + (scanning ? " scanning" : "");
+  }
+
+  function beep(freq, dur) {
+    try {
+      const a=new(window.AudioContext||window.webkitAudioContext)();
+      const o=a.createOscillator(), g=a.createGain();
+      o.connect(g); g.connect(a.destination);
+      o.frequency.value=freq; o.type="sine";
+      g.gain.setValueAtTime(0.3,a.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+dur/1000);
+      o.start(a.currentTime); o.stop(a.currentTime+dur/1000);
+    } catch(e){}
+  }
+</script>
+</body>
+</html>
